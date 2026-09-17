@@ -88,7 +88,7 @@ public struct Settings: Codable {
         let names = input.components(separatedBy: CharacterSet(charactersIn: ",、 \n\t"))
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }.filter { !$0.isEmpty }
         guard names.allSatisfy({ $0.range(of: #"^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$"#, options: .regularExpression) != nil }) else {
-            throw SignalError.message("組織名だけをカンマ区切りで入力する（URLやリポジトリ名は不要）")
+            throw SignalError.message("組織名またはユーザー名をカンマ区切りで入力してください。URLやリポジトリ名は不要です。")
         }
         return Array(Set(names)).sorted()
     }

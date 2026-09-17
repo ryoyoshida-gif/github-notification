@@ -32,7 +32,7 @@ public struct GitHubClient {
     public func account() async throws -> (login: String, now: Date) {
         let response = try await transport.get("/user")
         let user = try JSONCoding.decoder().decode(GitHubUser.self, from: response.data)
-        guard let now = response.serverDate else { throw SignalError.message("GitHubのサーバー時刻を取得できない") }
+        guard let now = response.serverDate else { throw SignalError.message("GitHubのサーバー時刻を取得できませんでした。") }
         return (user.login, now)
     }
 
@@ -40,7 +40,7 @@ public struct GitHubClient {
         let date = ISO8601DateFormatter().string(from: since)
         let first = try await transport.get("/notifications?all=true&since=\(date)&per_page=100&page=1")
         let threads: [NotificationThread] = try await pages(first, path: "/notifications?all=true&since=\(date)&per_page=100")
-        guard let serverDate = first.serverDate else { throw SignalError.message("GitHubのサーバー時刻を取得できない") }
+        guard let serverDate = first.serverDate else { throw SignalError.message("GitHubのサーバー時刻を取得できませんでした。") }
         return NotificationBatch(threads: threads, serverDate: serverDate,
                                  pollInterval: max(60, Double(first.headers["x-poll-interval"] ?? "60") ?? 60))
     }
@@ -57,7 +57,7 @@ public struct GitHubClient {
         for page in 1...100 {
             result += try JSONCoding.decoder().decode([T].self, from: response.data)
             guard response.headers["link"]?.contains("rel=\"next\"") == true else { return result }
-            guard page < 100 else { throw SignalError.message("取得量が上限を超えたため、同期を完了できない") }
+            guard page < 100 else { throw SignalError.message("通知の取得件数が上限を超えたため、更新を完了できませんでした。") }
             response = try await transport.get(path + "&page=\(page + 1)")
         }
         return result
@@ -71,7 +71,7 @@ public struct GitHubClient {
               url.password == nil, url.port == nil, url.query == nil,
               url.path.range(of: #"^/repos/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/(pulls|issues)/[0-9]+$"#,
                              options: .regularExpression) != nil else {
-            throw SignalError.message("通知の参照先を確認できない")
+            throw SignalError.message("通知のリンク先を確認できませんでした。")
         }
         let response = try await transport.get(url.path)
         let subject = try JSONCoding.decoder().decode(Subject.self, from: response.data)

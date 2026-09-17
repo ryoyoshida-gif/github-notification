@@ -45,7 +45,7 @@ final class AppModel: ObservableObject {
             ]
         } else {
             do { state = try store.load() }
-            catch { self.error = "保存データを読み込めない。データを保護するため同期を停止した：\(error.localizedDescription)"; ready = false }
+            catch { self.error = "保存データを読み込めないため、更新を停止しました：\(error.localizedDescription)"; ready = false }
         }
     }
 
@@ -79,7 +79,7 @@ final class AppModel: ObservableObject {
 
     func requestPermission() async {
         do { permissionGranted = try await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) }
-        catch { self.error = "通知の許可を確認できない：\(error.localizedDescription)" }
+        catch { self.error = "通知の許可状態を確認できませんでした：\(error.localizedDescription)" }
         await refreshPermission()
     }
 
@@ -98,7 +98,7 @@ final class AppModel: ObservableObject {
         do {
             let identity = try await client.account()
             if let account = state.account, account.caseInsensitiveCompare(identity.login) != .orderedSame {
-                throw SignalError.message("ghのアカウントが \(identity.login) に変わった。\(account) に戻してから再開する")
+                throw SignalError.message("GitHub CLIのアカウントが \(identity.login) に変わっています。\(account) に戻してから再開してください。")
             }
             state.account = identity.login
             let since = state.cursor?.addingTimeInterval(-1_800) ?? identity.now.addingTimeInterval(-86_400)
@@ -127,7 +127,7 @@ final class AppModel: ObservableObject {
             if state.pending.isEmpty {
                 lastSync = Date()
             } else {
-                error = "\(state.pending.count)件の取得が未完了。再試行する。\n" + failures.prefix(3).joined(separator: "\n")
+                error = "\(state.pending.count)件の通知を取得できませんでした。時間をおいて再試行します。\n" + failures.prefix(3).joined(separator: "\n")
                 nextSync = Date().addingTimeInterval(max(300, serverPollInterval))
             }
             // Keep acknowledgements for seven days, longer than the overlap and initial import.
@@ -159,7 +159,7 @@ final class AppModel: ObservableObject {
             state = try store.load()
             demo = false
             start()
-        } catch { self.error = "保存データを読み込めない：\(error.localizedDescription)" }
+        } catch { self.error = "保存データを読み込めませんでした：\(error.localizedDescription)" }
     }
 
     func snooze(_ id: String) {
@@ -200,7 +200,7 @@ final class AppModel: ObservableObject {
         guard permissionGranted else { return }
         let content = UNMutableNotificationContent()
         content.title = "GitHub Signal"
-        content.body = "通知を受け取れる状態になっている。未確認の通知はアプリの一覧に残る。"
+        content.body = "テスト通知です。未確認の通知はアプリの一覧から確認できます。"
         content.sound = .default
         do { try await UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: "test", content: content, trigger: nil)) }
         catch { self.error = error.localizedDescription }
@@ -219,8 +219,8 @@ final class AppModel: ObservableObject {
         do {
             if due.count > 3 {
                 let content = UNMutableNotificationContent()
-                content.title = "\(due.count)件のGitHub通知が未確認"
-                content.body = "メニューバーのGitHub Signalで内容を確認できる。"
+                content.title = "未確認のGitHub通知が\(due.count)件あります"
+                content.body = "メニューバーからGitHub Signalを開くと、内容を確認できます。"
                 content.sound = .default
                 try await UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: "inbox-summary", content: content, trigger: nil))
                 for signal in due { markNotified(signal.id, now: now) }
@@ -237,7 +237,7 @@ final class AppModel: ObservableObject {
                     markNotified(signal.id, now: now)
                 }
             }
-        } catch { self.error = "通知の送信に失敗した：\(error.localizedDescription)" }
+        } catch { self.error = "通知を送信できませんでした：\(error.localizedDescription)" }
     }
 
     private func markNotified(_ id: String, now: Date) {
@@ -253,7 +253,7 @@ final class AppModel: ObservableObject {
         do { try store.save(state); return true }
         catch {
             ready = false
-            self.error = "保存できないため同期を停止した：\(error.localizedDescription)"
+            self.error = "データを保存できないため、更新を停止しました：\(error.localizedDescription)"
             return false
         }
     }

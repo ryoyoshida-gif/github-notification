@@ -5,16 +5,16 @@ public struct GHTransport: GitHubTransport {
 
     public func get(_ path: String) async throws -> APIResponse {
         guard path.hasPrefix("/"), !path.hasPrefix("//"), !path.contains("\n"), !path.contains("\r") else {
-            throw SignalError.message("APIの参照先が不正")
+            throw SignalError.message("APIの接続先が正しくありません。")
         }
         return try await Task.detached(priority: .utility) {
             let candidates = ["/opt/homebrew/bin/gh", "/usr/local/bin/gh"]
             guard let binary = candidates.first(where: { FileManager.default.isExecutableFile(atPath: $0) }) else {
-                throw SignalError.message("GitHub CLIが必要。ターミナルで brew install gh を実行する")
+                throw SignalError.message("GitHub CLIが見つかりません。ターミナルで brew install gh を実行してください。")
             }
             let attributes = try FileManager.default.attributesOfItem(atPath: URL(fileURLWithPath: binary).resolvingSymlinksInPath().path)
             if let mode = attributes[.posixPermissions] as? NSNumber, mode.intValue & 0o022 != 0 {
-                throw SignalError.message("GitHub CLIが他のユーザーから書き換え可能になっている")
+                throw SignalError.message("GitHub CLIのファイル権限を確認してください。他のユーザーが書き換えられる状態になっています。")
             }
             let process = Process()
             process.executableURL = URL(fileURLWithPath: binary)
@@ -44,22 +44,22 @@ public struct GHTransport: GitHubTransport {
                 if output.count > 32 * 1_024 * 1_024 {
                     kill(process.processIdentifier, SIGKILL)
                     process.waitUntilExit()
-                    throw SignalError.message("GitHubの応答が大きすぎるため中断した")
+                    throw SignalError.message("GitHubからの応答が大きすぎるため、取得を中断しました。")
                 }
             }
             process.waitUntilExit()
             if process.terminationReason == .uncaughtSignal {
-                throw SignalError.message("GitHubとの通信がタイムアウトした。次回の同期で再試行する")
+                throw SignalError.message("GitHubとの通信がタイムアウトしました。次回の更新時に再試行します。")
             }
             return try Self.parse(output, exitCode: process.terminationStatus)
         }.value
     }
 
     public static func parse(_ data: Data, exitCode: Int32) throws -> APIResponse {
-        guard let text = String(data: data, encoding: .utf8) else { throw SignalError.message("GitHubの応答を読み取れない") }
+        guard let text = String(data: data, encoding: .utf8) else { throw SignalError.message("GitHubからの応答を読み取れませんでした。") }
         let normalized = text.replacingOccurrences(of: "\r\n", with: "\n")
         guard let boundary = normalized.range(of: "\n\n") else {
-            throw SignalError.message("GitHubに接続できない。ターミナルで gh auth status --hostname github.com を確認する")
+            throw SignalError.message("GitHubに接続できません。ターミナルで gh auth status --hostname github.com を実行し、ログイン状態を確認してください。")
         }
         let lines = normalized[..<boundary.lowerBound].split(separator: "\n")
         let status = lines.first?.split(separator: " ").dropFirst().first.flatMap { Int($0) } ?? 0
@@ -70,14 +70,14 @@ public struct GHTransport: GitHubTransport {
         }
         guard exitCode == 0, (200..<300).contains(status) else {
             switch status {
-            case 401: throw SignalError.message("GitHubの認証が切れている。gh auth login --hostname github.com で再認証する")
-            case 403, 429: throw SignalError.message("GitHubの権限不足またはAPI利用制限。ghの認証権限・SSOを確認する。5分後に再試行する")
-            case 404: throw SignalError.message("対象が削除されたか、読み取り権限がない")
-            default: throw SignalError.message("GitHubとの通信に失敗した（HTTP \(status)）。次回の同期で再試行する")
+            case 401: throw SignalError.message("GitHubへの再ログインが必要です。ターミナルで gh auth login --hostname github.com を実行してください。")
+            case 403, 429: throw SignalError.message("GitHubの権限が不足しているか、APIの利用上限に達しています。認証権限やSSOの認可を確認してください。5分後に再試行します。")
+            case 404: throw SignalError.message("対象が削除されたか、読み取り権限がありません。")
+            default: throw SignalError.message("GitHubとの通信に失敗しました（HTTP \(status)）。次回の更新時に再試行します。")
             }
         }
         let body = Data(normalized[boundary.upperBound...].utf8)
-        guard headers["content-type"]?.contains("json") == true else { throw SignalError.message("GitHubからJSON以外の応答が返された") }
+        guard headers["content-type"]?.contains("json") == true else { throw SignalError.message("GitHubから想定外の応答が返されました。") }
         return APIResponse(data: body, headers: headers)
     }
 }

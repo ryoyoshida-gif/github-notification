@@ -61,14 +61,14 @@ struct InboxView: View {
             Divider()
             if model.demo {
                 HStack {
-                    banner("デモ表示 · GitHubへの接続・通知・保存は行わない。", symbol: "eye", color: accent)
+                    banner("デモ表示中（サンプルデータ）", symbol: "eye", color: accent)
                     Button("デモを終了") { model.leaveDemo() }.padding(.trailing, 12)
                 }
             }
             if let error = model.error { banner(error, symbol: "exclamationmark.triangle", color: .orange) }
             if model.permissionDenied && model.state.enabled {
                 HStack {
-                    Text("macOSの通知が許可されていない。一覧への保存は継続する。")
+                    Text("通知がオフになっています。一覧の更新は続けています。")
                     Spacer()
                     Button("通知を許可") { Task { await model.requestPermission() } }
                     Button("通知設定を開く") {
@@ -105,13 +105,13 @@ struct InboxView: View {
     private var onboarding: some View {
         VStack(alignment: .leading, spacing: 14) {
             Spacer()
-            Text("必要な通知を、このMacに。")
+            Text("GitHubの大事な更新を通知")
                 .font(.system(size: 20, weight: .semibold))
-            Text("自分宛てのメンションとレビュー依頼、自分のPRへのコメントとレビューを集める。確認するまで一覧に残る。")
+            Text("メンション、レビュー依頼、自分のPRへのコメントをまとめて確認できます。")
                 .font(.body).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             VStack(alignment: .leading, spacing: 10) {
-                Label("GitHub CLIのログインを利用", systemImage: "person.crop.circle.badge.checkmark")
-                Text("未設定の場合は、ターミナルで次を実行する。")
+                Label("GitHub CLIでログイン", systemImage: "person.crop.circle.badge.checkmark")
+                Text("初めて使う場合は、ターミナルで次のコマンドを実行してください。")
                     .font(.system(size: 12)).foregroundStyle(.secondary)
                 Text("brew install gh\ngh auth login --hostname github.com")
                     .font(.system(.callout, design: .monospaced)).textSelection(.enabled)
@@ -119,11 +119,11 @@ struct InboxView: View {
                     .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 10))
             }
             HStack {
-                Button("GitHubに接続して通知を始める") { Task { await model.connect() } }
+                Button("通知を開始") { Task { await model.connect() } }
                     .buttonStyle(.borderedProminent).disabled(!model.ready)
                 Button("デモを見る") { model.enterDemo() }
             }
-            Text("初回は直近24時間を取り込む。GitHub上の既読状態は変更しない。")
+            Text("初回は直近24時間の通知を取得します。GitHubの既読状態は変わりません。")
                 .font(.system(size: 12)).foregroundStyle(.secondary)
             Spacer()
         }.padding(24)
@@ -164,8 +164,8 @@ struct InboxView: View {
                 VStack(spacing: 12) {
                     Image(systemName: model.syncing ? "arrow.triangle.2.circlepath" : "checkmark.circle")
                         .font(.system(size: 38, weight: .light)).foregroundStyle(accent)
-                    Text(model.syncing ? "GitHubの更新を確認中" : "該当する通知はない").font(.title3.weight(.medium))
-                    Text(model.error != nil ? "取得エラーの詳細は上部に表示している。" : "新しい更新は自動でここに届く。")
+                    Text(model.syncing ? "GitHubの更新を確認中" : "該当する通知はありません").font(.title3.weight(.medium))
+                    Text(model.error != nil ? "取得中にエラーが発生しました。画面上部のメッセージを確認してください。" : "新しい通知は自動で表示されます。")
                         .foregroundStyle(.secondary)
                 }.frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
@@ -243,7 +243,7 @@ struct InboxView: View {
                     .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
                     .accessibilityLabel("通知の操作").help("開く・確認済み・スヌーズ")
             }.font(.system(size: 12))
-            Text(preview.isEmpty ? "本文はGitHubで確認できる" : preview)
+            Text(preview.isEmpty ? "本文はGitHubで確認できます" : preview)
                 .font(.system(size: 13)).lineLimit(2).textSelection(.enabled)
                 .frame(maxWidth: .infinity, alignment: .leading)
             if expanded {
@@ -286,10 +286,10 @@ struct InboxView: View {
     private var settings: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("通知設定").font(.headline)
-            Text("メンション・レビュー依頼・自分のPRへのコメントとレビューが対象。自分自身の投稿は除外する。")
+            Text("メンション、レビュー依頼、自分のPRへのコメント・レビューを通知します。自分の投稿は通知しません。")
                 .foregroundStyle(.secondary)
             VStack(alignment: .leading, spacing: 8) {
-                Text("通知する組織・オーナー").font(.headline)
+                Text("通知対象の組織・ユーザー").font(.headline)
                 HStack {
                     TextField("org-a, org-b（空欄はすべて）", text: $organizationsInput)
                         .textFieldStyle(.roundedBorder)
@@ -301,22 +301,22 @@ struct InboxView: View {
                         } catch { settingsError = error.localizedDescription }
                     }
                 }
-                Text("一覧・メニューバーの件数・プッシュ通知をまとめて絞り込む。")
+                Text("指定した組織・ユーザーのリポジトリだけを通知します。")
                     .font(.system(size: 12)).foregroundStyle(.secondary)
                 if !model.availableOrganizations.isEmpty {
-                    Text("取得済み：" + model.availableOrganizations.joined(separator: ", "))
+                    Text("候補：" + model.availableOrganizations.joined(separator: ", "))
                         .font(.system(size: 12)).foregroundStyle(.secondary).textSelection(.enabled)
                 }
                 if let settingsError { Text(settingsError).font(.system(size: 12)).foregroundStyle(.orange) }
             }
-            Picker("確認間隔", selection: Binding(get: { model.state.settings.pollSeconds }, set: { value in model.updateSettings { $0.pollSeconds = value } })) {
+            Picker("更新間隔", selection: Binding(get: { model.state.settings.pollSeconds }, set: { value in model.updateSettings { $0.pollSeconds = value } })) {
                 Text("2分").tag(120); Text("5分").tag(300); Text("10分").tag(600)
             }
-            Picker("未確認の再通知", selection: Binding(get: { model.state.settings.reminderMinutes }, set: { value in model.updateSettings { $0.reminderMinutes = value } })) {
+            Picker("未確認の通知を再通知", selection: Binding(get: { model.state.settings.reminderMinutes }, set: { value in model.updateSettings { $0.reminderMinutes = value } })) {
                 Text("なし").tag(0); Text("15分").tag(15); Text("30分").tag(30); Text("1時間").tag(60)
             }
             Toggle("Botからの更新も通知する", isOn: Binding(get: { model.state.settings.includeBots }, set: { value in model.updateSettings { $0.includeBots = value } }))
-            Text("ウィンドウを閉じてもメニューバーに常駐する。Macのスリープ中やアプリ終了中は通知できない。")
+            Text("ウィンドウを閉じても通知は届きます。スリープ中やアプリ終了中は停止します。")
                 .font(.system(size: 12)).foregroundStyle(.secondary)
             HStack {
                 Button("テスト通知") { Task { await model.testNotification() } }.disabled(model.demo)

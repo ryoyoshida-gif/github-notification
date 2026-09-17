@@ -73,8 +73,8 @@ private struct SignalMenu: View {
     var body: some View {
         Button("未確認 \(model.pendingThreadCount)件を開く") { showInbox() }
         if let account = model.state.account { Text("@\(account)") }
-        if model.demo { Text("デモ表示中・GitHubには接続しない") }
-        if model.error != nil { Text("取得に問題あり・一覧で詳細を確認") }
+        if model.demo { Text("デモ表示中") }
+        if model.error != nil { Text("通知を取得できません。一覧で詳細を確認できます。") }
         Divider()
         Button(model.syncing ? "確認中…" : "今すぐ確認") { Task { await model.sync() } }
             .disabled(!model.state.enabled || model.syncing || Date() < model.nextSync)
