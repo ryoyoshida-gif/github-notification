@@ -6,6 +6,7 @@ struct InboxView: View {
     @ObservedObject var model: AppModel
     @AppStorage("backgroundTransparency") private var backgroundTransparency = 0.18
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.colorScheme) private var colorScheme
     @State private var filter = "すべて"
     @State private var search = ""
     @State private var settingsOpen = false
@@ -158,6 +159,10 @@ struct InboxView: View {
                     ForEach(SignalKind.allCases, id: \.self) { kind in Text(kind.title).tag(kind.title) }
                 }.labelsHidden().frame(width: 105)
             }.font(.system(size: 13)).controlSize(.small).padding(.horizontal, 8).padding(.top, 4)
+                // These controls are AppKit views. They keep the appearance they
+                // were built with, so a light/dark switch alone leaves them stale
+                // until something else rebuilds them. Rebuild them on the switch.
+                .id(colorScheme)
             HStack(spacing: 6) {
                 Text("\(groups.count)件").monospacedDigit().foregroundStyle(.secondary).fixedSize()
                 if !organization.isEmpty || !repository.isEmpty || filter != "すべて" {
@@ -169,6 +174,7 @@ struct InboxView: View {
                 Toggle("確認済み", isOn: $showAcknowledged).toggleStyle(.checkbox)
                 TextField("検索", text: $search).textFieldStyle(.roundedBorder).frame(width: 110)
             }.font(.system(size: 13)).controlSize(.small).padding(.horizontal, 8).padding(.vertical, 4)
+                .id(colorScheme)
             if visible.isEmpty {
                 VStack(spacing: 12) {
                     Image(systemName: model.syncing ? "arrow.triangle.2.circlepath" : "checkmark.circle")
