@@ -218,14 +218,21 @@ struct InboxView: View {
                     HStack {
                         if !expanded {
                             ActorAvatar(actor: latest.actor)
-                            Text("@" + latest.actor).fontWeight(.semibold).lineLimit(1)
-                                .help(latest.actor)
-                            Text(latest.kind == .mention ? "メンション" : shortLabel(latest.kind))
-                                .foregroundStyle(.secondary).fixedSize()
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text("@" + latest.actor).fontWeight(.semibold).lineLimit(1)
+                                    .help(latest.actor)
+                                Text(shortLabel(latest.kind)).font(.system(size: 12))
+                                    .foregroundStyle(.secondary)
+                            }
                         }
                         Spacer()
-                        Button("GitHubで開く") { model.open(latest) }
-                            .buttonStyle(.borderless)
+                        HStack(spacing: 6) {
+                            Button("GitHubで開く") { model.open(latest) }
+                            if !showAcknowledged {
+                                Button("確認済み") { model.acknowledgeThread(group.id) }
+                                    .help("このPR・Issueの通知をすべて確認済みにする")
+                            }
+                        }.buttonStyle(.bordered).controlSize(.small).fixedSize()
                     }.font(.system(size: 13))
                 }.padding(.horizontal, 10).padding(.vertical, 6)
                 if expanded {

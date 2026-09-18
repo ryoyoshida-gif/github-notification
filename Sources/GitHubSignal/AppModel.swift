@@ -178,6 +178,15 @@ final class AppModel: ObservableObject {
         if persist() { UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: [id]) }
     }
 
+    func acknowledgeThread(_ threadKey: String) {
+        let ids = state.signals.filter { $0.threadKey == threadKey && !$0.acknowledged }.map(\.id)
+        guard !ids.isEmpty else { return }
+        for index in state.signals.indices where state.signals[index].threadKey == threadKey {
+            state.signals[index].acknowledged = true
+        }
+        if persist() { UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: ids) }
+    }
+
     func enterDemo() {
         guard !state.enabled, !syncing else { return }
         updateLoop?.cancel()
