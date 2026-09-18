@@ -91,7 +91,7 @@ struct InboxView: View {
             footer
         }
         .frame(minWidth: 380, minHeight: 280)
-        .background(InboxMaterial())
+        .background(InboxBackground())
         .tint(accent)
         .sheet(isPresented: $settingsOpen) { settings }
     }
@@ -377,9 +377,29 @@ struct InboxView: View {
 }
 
 // Native vibrancy follows macOS appearance and accessibility settings.
-private struct InboxMaterial: NSViewRepresentable {
+// The transparency setting is expressed by how much of an opaque window-colored
+// cover is drawn over the material, because the material cannot be dimmed:
+// `.behindWindow` blending punches a hole through the window at the window-server
+// level, so neither the view's alphaValue nor an opaque window background closes
+// it. Only content drawn above the material does.
+private struct InboxBackground: View {
     @AppStorage("backgroundTransparency") private var backgroundTransparency = 0.18
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+
+    // The slider maximum. This value counts as 100% transparency.
+    static let maxTransparency = 0.6
+
+    var body: some View {
+        let transparency = reduceTransparency ? 0 : min(Self.maxTransparency, max(0, backgroundTransparency))
+        // Fully covered at 0%, fully uncovered at the maximum, linear in between
+        // so the first step off zero does not jump.
+        let cover = 1 - transparency / Self.maxTransparency
+        InboxMaterial()
+            .overlay(Color(nsColor: .windowBackgroundColor).opacity(cover))
+    }
+}
+
+private struct InboxMaterial: NSViewRepresentable {
     func makeNSView(context: Context) -> NSVisualEffectView {
         let view = MaterialView()
         view.material = .hudWindow
@@ -388,9 +408,7 @@ private struct InboxMaterial: NSViewRepresentable {
         return view
     }
 
-    func updateNSView(_ nsView: NSVisualEffectView, context: Context) {
-        nsView.alphaValue = reduceTransparency ? 1 : 1 - min(0.6, max(0, backgroundTransparency))
-    }
+    func updateNSView(_ nsView: NSVisualEffectView, context: Context) {}
 
     private final class MaterialView: NSVisualEffectView {
         override func viewDidMoveToWindow() {
