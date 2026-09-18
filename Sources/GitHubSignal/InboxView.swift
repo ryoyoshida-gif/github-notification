@@ -4,6 +4,8 @@ import NotificationCore
 
 struct InboxView: View {
     @ObservedObject var model: AppModel
+    @AppStorage("backgroundTransparency") private var backgroundTransparency = 0.18
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @State private var filter = "すべて"
     @State private var search = ""
     @State private var settingsOpen = false
@@ -308,6 +310,18 @@ struct InboxView: View {
     private var settings: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("通知設定").font(.headline)
+            HStack {
+                Text("背景の透過率")
+                Slider(value: $backgroundTransparency, in: 0...0.6, step: 0.01)
+                    .accessibilityLabel("背景の透過率")
+                    .disabled(reduceTransparency)
+                Text("\(Int((backgroundTransparency * 100).rounded()))%")
+                    .monospacedDigit().frame(width: 35, alignment: .trailing)
+            }
+            if reduceTransparency {
+                Text("macOSの「透明度を下げる」が有効なため、透過率は反映されません。")
+                    .font(.system(size: 12)).foregroundStyle(.secondary)
+            }
             Text("メンション、レビュー依頼、自分のPRへのコメント・レビューを通知します。自分の投稿は通知しません。")
                 .foregroundStyle(.secondary)
             VStack(alignment: .leading, spacing: 8) {
@@ -357,6 +371,7 @@ struct InboxView: View {
 
 // Native vibrancy follows macOS appearance and accessibility settings.
 private struct InboxMaterial: NSViewRepresentable {
+    @AppStorage("backgroundTransparency") private var backgroundTransparency = 0.18
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     func makeNSView(context: Context) -> NSVisualEffectView {
         let view = MaterialView()
@@ -367,7 +382,7 @@ private struct InboxMaterial: NSViewRepresentable {
     }
 
     func updateNSView(_ nsView: NSVisualEffectView, context: Context) {
-        nsView.alphaValue = reduceTransparency ? 1 : 0.82
+        nsView.alphaValue = reduceTransparency ? 1 : 1 - min(0.6, max(0, backgroundTransparency))
     }
 
     private final class MaterialView: NSVisualEffectView {
