@@ -59,6 +59,13 @@ struct InboxView: View {
         VStack(alignment: .leading, spacing: 0) {
             header
             Divider()
+            if let version = model.availableRelease, !model.demo {
+                HStack {
+                    Text("新しいバージョン \(version)")
+                    Spacer()
+                    Button("ダウンロード") { model.openRelease() }
+                }.font(.system(size: 13)).padding(8)
+            }
             if model.demo {
                 HStack {
                     banner("デモ表示中（サンプルデータ）", symbol: "eye", color: accent)

@@ -78,6 +78,14 @@ private struct SignalMenu: View {
         Divider()
         Button(model.syncing ? "確認中…" : "今すぐ確認") { Task { await model.sync() } }
             .disabled(!model.state.enabled || model.syncing || Date() < model.nextSync)
+        Divider()
+        if let version = model.availableRelease {
+            Button("新しいバージョン \(version) をダウンロード") { model.openRelease() }
+        }
+        Button(model.checkingUpdate ? "アプリの更新を確認中…" : "アプリの更新を確認") {
+            Task { await model.checkForUpdates(manual: true) }
+        }.disabled(model.checkingUpdate || model.demo)
+        if let status = model.updateStatus { Text(status) }
         Button("終了") { NSApplication.shared.terminate(nil) }.keyboardShortcut("q")
         // The menu remains mounted when the inbox window is closed.
         Text("GitHub Signal").hidden()

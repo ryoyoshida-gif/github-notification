@@ -14,6 +14,11 @@ final class AppModel: ObservableObject {
     @Published private(set) var nextSync = Date.distantPast
     @Published private(set) var ready = true
     @Published private(set) var demo: Bool
+    @Published private(set) var availableRelease: String?
+    @Published private(set) var checkingUpdate = false
+    @Published private(set) var updateStatus: String?
+    let appVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.0.0"
+    private var updateLoop: Task<Void, Never>?
     private let store: StateStore
     private let client = GitHubClient(transport: GHTransport())
     private var loop: Task<Void, Never>?
@@ -50,7 +55,16 @@ final class AppModel: ObservableObject {
     }
 
     func start() {
-        guard loop == nil, ready, !demo else { return }
+        guard !demo else { return }
+        if updateLoop == nil {
+            updateLoop = Task { [weak self] in
+                while !Task.isCancelled {
+                    await self?.checkForUpdates()
+                    try? await Task.sleep(nanoseconds: 86_400_000_000_000)
+                }
+            }
+        }
+        guard loop == nil, ready else { return }
         loop = Task { [weak self] in
             while !Task.isCancelled {
                 guard let self else { return }
@@ -63,6 +77,23 @@ final class AppModel: ObservableObject {
             }
         }
     }
+
+    func checkForUpdates(manual: Bool = false) async {
+        guard !demo, !checkingUpdate else { return }
+        checkingUpdate = true
+        defer { checkingUpdate = false }
+        if manual { updateStatus = nil }
+        do {
+            let release = try await AppRelease.fetch()
+            guard !demo else { return }
+            availableRelease = release.isNewer(than: appVersion) ? release.tag_name : nil
+            updateStatus = availableRelease == nil ? "最新版を使用しています" : nil
+        } catch {
+            if manual, !demo { updateStatus = "更新を確認できませんでした。時間をおいて再試行してください。" }
+        }
+    }
+
+    func openRelease() { NSWorkspace.shared.open(AppRelease.downloadURL) }
 
     func connect() async {
         guard ready, !demo else { return }
@@ -149,6 +180,10 @@ final class AppModel: ObservableObject {
 
     func enterDemo() {
         guard !state.enabled, !syncing else { return }
+        updateLoop?.cancel()
+        updateLoop = nil
+        availableRelease = nil
+        updateStatus = nil
         state = AppModel(demo: true).state
         demo = true
     }
