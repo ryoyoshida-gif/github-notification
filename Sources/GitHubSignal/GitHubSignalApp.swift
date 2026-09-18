@@ -56,7 +56,7 @@ struct GitHubSignalApp: App {
             InboxView(model: model)
                 .task { model.start() }
         }
-        .defaultSize(width: 480, height: 440)
+        .defaultSize(width: 420, height: 360)
         MenuBarExtra {
             SignalMenu(model: model)
                 .task { model.start() }

@@ -88,7 +88,7 @@ struct InboxView: View {
             Divider()
             footer
         }
-        .frame(minWidth: 440, minHeight: 320)
+        .frame(minWidth: 380, minHeight: 280)
         .background(InboxMaterial())
         .tint(accent)
         .sheet(isPresented: $settingsOpen) { settings }
@@ -142,7 +142,7 @@ struct InboxView: View {
                 Picker("組織", selection: $organization) {
                     Text("すべての組織").tag("")
                     ForEach(organizations, id: \.self) { Text($0).tag($0) }
-                }.labelsHidden().frame(width: 140)
+                }.labelsHidden().frame(width: 100)
                     .onChange(of: organization) { _ in repository = "" }
                 Picker("リポジトリ", selection: $repository) {
                     Text("すべてのリポジトリ").tag("")
@@ -151,18 +151,18 @@ struct InboxView: View {
                             .tag(name)
                     }
                 }.labelsHidden().frame(maxWidth: .infinity)
-                Text("\(groups.count)件").monospacedDigit().foregroundStyle(.secondary).fixedSize()
-                if !organization.isEmpty || !repository.isEmpty {
-                    Button { organization = ""; repository = "" } label: { Image(systemName: "xmark.circle") }
-                        .buttonStyle(.borderless).help("組織・リポジトリの絞り込みを解除")
-                        .accessibilityLabel("組織・リポジトリの絞り込みを解除")
-                }
-            }.font(.system(size: 13)).controlSize(.small).padding(.horizontal, 8).padding(.top, 4)
-            HStack {
                 Picker("種類", selection: $filter) {
-                    Text("すべて").tag("すべて")
+                    Text("すべての種類").tag("すべて")
                     ForEach(SignalKind.allCases, id: \.self) { kind in Text(kind.title).tag(kind.title) }
-                }.labelsHidden().frame(width: 160)
+                }.labelsHidden().frame(width: 105)
+            }.font(.system(size: 13)).controlSize(.small).padding(.horizontal, 8).padding(.top, 4)
+            HStack(spacing: 6) {
+                Text("\(groups.count)件").monospacedDigit().foregroundStyle(.secondary).fixedSize()
+                if !organization.isEmpty || !repository.isEmpty || filter != "すべて" {
+                    Button { organization = ""; repository = ""; filter = "すべて" } label: { Image(systemName: "xmark.circle") }
+                        .buttonStyle(.borderless).help("絞り込みを解除")
+                        .accessibilityLabel("絞り込みを解除")
+                }
                 Spacer()
                 Toggle("確認済み", isOn: $showAcknowledged).toggleStyle(.checkbox)
                 TextField("検索", text: $search).textFieldStyle(.roundedBorder).frame(width: 110)
@@ -215,8 +215,11 @@ struct InboxView: View {
                         .accessibilityLabel("\(latest.title)をGitHubで開く")
                     HStack {
                         if !expanded {
-                            Text("\(latest.actor) · \(shortLabel(latest.kind))")
-                                .foregroundStyle(.secondary).lineLimit(1)
+                            ActorAvatar(actor: latest.actor)
+                            Text("@" + latest.actor).fontWeight(.semibold).lineLimit(1)
+                                .help(latest.actor)
+                            Text(latest.kind == .mention ? "メンション" : shortLabel(latest.kind))
+                                .foregroundStyle(.secondary).fixedSize()
                         }
                         Spacer()
                         Button("GitHubで開く") { model.open(latest) }
@@ -236,7 +239,8 @@ struct InboxView: View {
         let preview = SignalPreview.text(signal.excerpt)
         return VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 6) {
-                Text(signal.actor).fontWeight(.medium).lineLimit(1)
+                ActorAvatar(actor: signal.actor)
+                Text("@" + signal.actor).fontWeight(.semibold).lineLimit(1).help(signal.actor)
                 Text(shortLabel(signal.kind)).foregroundStyle(.secondary).help(signal.kind.title)
                 Spacer()
                 if snoozed {
@@ -353,15 +357,18 @@ struct InboxView: View {
 
 // Native vibrancy follows macOS appearance and accessibility settings.
 private struct InboxMaterial: NSViewRepresentable {
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     func makeNSView(context: Context) -> NSVisualEffectView {
         let view = MaterialView()
-        view.material = .sidebar
+        view.material = .hudWindow
         view.blendingMode = .behindWindow
-        view.state = .followsWindowActiveState
+        view.state = .active
         return view
     }
 
-    func updateNSView(_ nsView: NSVisualEffectView, context: Context) {}
+    func updateNSView(_ nsView: NSVisualEffectView, context: Context) {
+        nsView.alphaValue = reduceTransparency ? 1 : 0.82
+    }
 
     private final class MaterialView: NSVisualEffectView {
         override func viewDidMoveToWindow() {
@@ -369,5 +376,29 @@ private struct InboxMaterial: NSViewRepresentable {
             window?.isOpaque = false
             window?.backgroundColor = .clear
         }
+    }
+}
+
+private struct ActorAvatar: View {
+    let actor: String
+
+    private var url: URL? {
+        // GitHub user logins use ASCII letters, digits and hyphens. Bot logins use the fallback.
+        guard !actor.isEmpty, actor.utf8.allSatisfy({
+            (65...90).contains($0) || (97...122).contains($0) || (48...57).contains($0) || $0 == 45
+        }) else { return nil }
+        return URL(string: "https://github.com/\(actor).png?size=48")
+    }
+
+    var body: some View {
+        AsyncImage(url: url) { image in
+            image.resizable().scaledToFill()
+        } placeholder: {
+            Text(String(actor.prefix(1)).uppercased())
+                .font(.system(size: 11, weight: .semibold))
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color.secondary.opacity(0.15))
+        }
+        .frame(width: 22, height: 22).clipShape(Circle()).accessibilityHidden(true)
     }
 }
