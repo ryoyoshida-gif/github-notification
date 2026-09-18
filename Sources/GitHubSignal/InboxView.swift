@@ -89,7 +89,7 @@ struct InboxView: View {
             footer
         }
         .frame(minWidth: 440, minHeight: 320)
-        .background(Color(nsColor: .windowBackgroundColor))
+        .background(InboxMaterial())
         .tint(accent)
         .sheet(isPresented: $settingsOpen) { settings }
     }
@@ -192,28 +192,37 @@ struct InboxView: View {
         let expanded = expandedGroups.contains(group.id)
         return VStack(alignment: .leading, spacing: 0) {
             if let latest = group.signals.first {
-                Button {
-                    if expanded { expandedGroups.remove(group.id) } else { expandedGroups.insert(group.id) }
-                } label: {
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack(spacing: 6) {
-                            Text(latest.repository).lineLimit(1)
-                            Spacer()
-                            Text(showAcknowledged ? "\(group.signals.count)件" : "未確認 \(group.signals.count)")
-                            Text(latest.date, style: .relative).fixedSize()
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 6) {
+                        Text(latest.repository).lineLimit(1)
+                        Spacer()
+                        Text(showAcknowledged ? "\(group.signals.count)件" : "未確認 \(group.signals.count)")
+                        Text(latest.date, style: .relative).fixedSize()
+                        Button {
+                            if expanded { expandedGroups.remove(group.id) } else { expandedGroups.insert(group.id) }
+                        } label: {
                             Image(systemName: expanded ? "chevron.up" : "chevron.down")
-                        }.font(.system(size: 12)).foregroundStyle(.secondary)
+                                .frame(width: 24, height: 24).contentShape(Rectangle())
+                        }.buttonStyle(.plain)
+                            .accessibilityLabel("\(latest.title)の更新を\(expanded ? "閉じる" : "展開する")")
+                            .help(expanded ? "更新を閉じる" : "更新を展開する")
+                    }.font(.system(size: 12)).foregroundStyle(.secondary)
+                    Button { model.open(latest) } label: {
                         Text(latest.title).font(.system(size: 14, weight: .semibold))
                             .foregroundStyle(.primary).lineLimit(2)
+                            .frame(maxWidth: .infinity, alignment: .leading).contentShape(Rectangle())
+                    }.buttonStyle(.plain).help("GitHubで開く")
+                        .accessibilityLabel("\(latest.title)をGitHubで開く")
+                    HStack {
                         if !expanded {
                             Text("\(latest.actor) · \(shortLabel(latest.kind))")
-                                .font(.system(size: 13)).foregroundStyle(.secondary).lineLimit(1)
+                                .foregroundStyle(.secondary).lineLimit(1)
                         }
-                    }.frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, 10).padding(.vertical, 8)
-                        .contentShape(Rectangle())
-                }.buttonStyle(.plain)
-                    .accessibilityLabel("\(latest.title)、\(group.signals.count)件の更新を\(expanded ? "閉じる" : "開く")")
+                        Spacer()
+                        Button("GitHubで開く") { model.open(latest) }
+                            .buttonStyle(.borderless)
+                    }.font(.system(size: 13))
+                }.padding(.horizontal, 10).padding(.vertical, 6)
                 if expanded {
                     ForEach(group.signals) { signal in row(signal) }
                 }
@@ -234,8 +243,10 @@ struct InboxView: View {
                     Image(systemName: "moon.zzz").foregroundStyle(.orange).help("スヌーズ中")
                 }
                 Text(signal.date, style: .relative).foregroundStyle(.secondary).fixedSize()
+                Button { model.open(signal) } label: {
+                    Image(systemName: "arrow.up.right.square")
+                }.buttonStyle(.borderless).help("GitHubで開く").accessibilityLabel("GitHubで開く")
                 Menu {
-                    Button("GitHubで開く") { model.open(signal) }
                     if !signal.acknowledged {
                         Button("確認済みにする") { model.acknowledge(signal.id) }
                         Button(snoozed ? "スヌーズ解除" : "1時間後に通知") {
@@ -248,7 +259,7 @@ struct InboxView: View {
                     }
                 } label: { Image(systemName: "ellipsis") }
                     .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
-                    .accessibilityLabel("通知の操作").help("開く・確認済み・スヌーズ")
+                    .accessibilityLabel("通知の操作").help("確認済み・スヌーズ・本文")
             }.font(.system(size: 12))
             Text(preview.isEmpty ? "本文はGitHubで確認できます" : preview)
                 .font(.system(size: 13)).lineLimit(2).textSelection(.enabled)
@@ -337,5 +348,26 @@ struct InboxView: View {
     private func banner(_ text: String, symbol: String, color: Color) -> some View {
         Label(text, systemImage: symbol).font(.system(size: 12)).foregroundStyle(color)
             .frame(maxWidth: .infinity, alignment: .leading).padding(12).background(color.opacity(0.08))
+    }
+}
+
+// Native vibrancy follows macOS appearance and accessibility settings.
+private struct InboxMaterial: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSVisualEffectView {
+        let view = MaterialView()
+        view.material = .sidebar
+        view.blendingMode = .behindWindow
+        view.state = .followsWindowActiveState
+        return view
+    }
+
+    func updateNSView(_ nsView: NSVisualEffectView, context: Context) {}
+
+    private final class MaterialView: NSVisualEffectView {
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            window?.isOpaque = false
+            window?.backgroundColor = .clear
+        }
     }
 }
